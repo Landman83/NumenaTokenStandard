@@ -14,11 +14,13 @@ import "../src/modules/STO/USDTiered/USDTieredSTOFactory.sol";
 import "../src/modules/Wallet/VestingEscrowWalletFactory.sol";
 import "../src/interfaces/ISecurityToken.sol";
 import "../src/interfaces/IPolymathRegistry.sol";
+import "../src/interfaces/IERC20.sol";
 
 contract DeploySTScript is Script {
     // Constants
     bytes32 constant LOCKUP_NAME = "REG_D_LOCKUP";
     uint256 constant LOCKUP_PERIOD = 6 minutes; // 6 minutes lockup as requested
+    address constant USDC_ADDRESS = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48; // Mainnet USDC address - replace for testnet
     
     function setUp() public {}
 
@@ -94,11 +96,11 @@ contract DeploySTScript is Script {
         
         console.log("LockUpTransferManager deployed at:", ltmModule);
         
-        // Set up the lockup type with 6-minute period
+        // Set up the lockup type with 6-minute period - single release at end
         uint256 lockupAmount = 1000 * (10 ** uint256(decimals)); // Example amount to lock
         uint256 startTime = block.timestamp;
         uint256 lockUpPeriodSeconds = 6 minutes;
-        uint256 releaseFrequencySeconds = 1 minutes; // Release tokens every minute
+        uint256 releaseFrequencySeconds = 6 minutes; // Set equal to lockup period for single release
         
         // Call function on the module
         (bool success,) = ltmModule.call(
@@ -155,9 +157,7 @@ contract DeploySTScript is Script {
         
         console.log("TrackedRedemption (Burn) module deployed at:", burnModule);
         
-        // 4. Deploy and configure Dividend modules
-        
-        // 4.1 ERC20 Dividend Checkpoint
+        // 4. Deploy and configure Dividend modules - ERC20 only
         ERC20DividendCheckpointFactory erc20DividendFactory;
         address erc20DividendFactoryAddress = vm.envAddress("ERC20_DIVIDEND_FACTORY_ADDRESS");
         if (erc20DividendFactoryAddress == address(0)) {
@@ -177,27 +177,6 @@ contract DeploySTScript is Script {
         );
         
         console.log("ERC20DividendCheckpoint module deployed at:", erc20DividendModule);
-        
-        // 4.2 Ether Dividend Checkpoint
-        EtherDividendCheckpointFactory etherDividendFactory;
-        address etherDividendFactoryAddress = vm.envAddress("ETHER_DIVIDEND_FACTORY_ADDRESS");
-        if (etherDividendFactoryAddress == address(0)) {
-            etherDividendFactory = new EtherDividendCheckpointFactory(polymathRegistry);
-        } else {
-            etherDividendFactory = EtherDividendCheckpointFactory(etherDividendFactoryAddress);
-        }
-        
-        // Add EtherDividendCheckpoint module to security token
-        bytes memory etherDividendSetupData = ""; // No setup data needed for initialization
-        address etherDividendModule = token.addModule(
-            address(etherDividendFactory),
-            etherDividendSetupData,
-            0, // Budget unused
-            0, // Budget unused
-            false // Archived set to false
-        );
-        
-        console.log("EtherDividendCheckpoint module deployed at:", etherDividendModule);
         
         // 5. Deploy and configure Voting modules
         
@@ -245,7 +224,7 @@ contract DeploySTScript is Script {
         
         // 6. Deploy and configure STO modules
         
-        // 6.1 Capped STO
+        // 6.1 Capped STO - USDC only
         CappedSTOFactory cappedSTOFactory;
         address cappedSTOFactoryAddress = vm.envAddress("CAPPED_STO_FACTORY_ADDRESS");
         if (cappedSTOFactoryAddress == address(0)) {
@@ -255,18 +234,18 @@ contract DeploySTScript is Script {
         }
         
         // Capped STO configuration parameters
-        uint256 startTime = block.timestamp + 1 days; // Start in 1 day
-        uint256 endTime = startTime + 30 days; // Last for 30 days
+        uint256 stoStartTime = block.timestamp + 10 minutes; // Start in 10 minutes
+        uint256 stoEndTime = stoStartTime + 30 days; // Last for 30 days
         uint256 cap = 1000000 * (10 ** uint256(decimals)); // Cap of 1 million tokens
-        uint256 rate = 1000; // 1000 tokens per ETH
+        uint256 rate = 100; // 1 token per 100 USDC (adjusted for USDC's 6 decimals)
         address fundsReceiver = vm.envAddress("FUNDS_RECEIVER");
         bool treasury = true; // Use treasury as funds receiver if specified
         
         // Encode setup parameters for Capped STO
         bytes memory cappedSTOSetupData = abi.encodeWithSignature(
             "configure(uint256,uint256,uint256,uint256,address,bool)",
-            startTime,
-            endTime,
+            stoStartTime,
+            stoEndTime,
             cap,
             rate,
             fundsReceiver,
@@ -284,7 +263,7 @@ contract DeploySTScript is Script {
         
         console.log("CappedSTO module deployed at:", cappedSTOModule);
         
-        // 6.2 USDTiered STO
+        // 6.2 USDTiered STO - USDC only
         USDTieredSTOFactory usdTieredSTOFactory;
         address usdTieredSTOFactoryAddress = vm.envAddress("USD_TIERED_STO_FACTORY_ADDRESS");
         if (usdTieredSTOFactoryAddress == address(0)) {
@@ -293,25 +272,33 @@ contract DeploySTScript is Script {
             usdTieredSTOFactory = USDTieredSTOFactory(usdTieredSTOFactoryAddress);
         }
         
-        // For USDTiered STO, the configuration is complex, so we'll use a minimal version
-        // In a real deployment, you would want to customize these parameters further
-        uint256 usdStartTime = block.timestamp + 2 days;
-        uint256 usdEndTime = usdStartTime + 60 days;
-        address[] memory usdTiers = new address[](1);
-        usdTiers[0] = treasuryWallet; // Simplified - would normally set up actual tiers
+        // USDTiered STO configuration
+        uint256 usdStartTime = block.timestamp + 15 minutes; // Start in 15 minutes
+        uint256 usdEndTime = usdStartTime + 60 days; // Last for 60 days
         
-        // Encode setup parameters for USDTiered STO (simplified)
-        // The actual configuration would need more parameters
+        // Set up tiers - example with 3 tiers
+        uint256[] memory rates = new uint256[](3);
+        rates[0] = 100; // 1 token = 100 USDC (Tier 1 - early investors)
+        rates[1] = 120; // 1 token = 120 USDC (Tier 2)
+        rates[2] = 150; // 1 token = 150 USDC (Tier 3 - late investors)
+        
+        uint256[] memory tokensPerTier = new uint256[](3);
+        tokensPerTier[0] = 300000 * (10 ** uint256(decimals)); // 300K tokens in tier 1
+        tokensPerTier[1] = 300000 * (10 ** uint256(decimals)); // 300K tokens in tier 2
+        tokensPerTier[2] = 400000 * (10 ** uint256(decimals)); // 400K tokens in tier 3
+        
+        // Setup data for USDTiered STO
         bytes memory usdTieredSTOSetupData = abi.encodeWithSignature(
-            "configure(uint256,uint256,address[])",
+            "configure(uint256,uint256,uint256[],uint256[],address,bool)",
             usdStartTime,
             usdEndTime,
-            usdTiers
+            rates,
+            tokensPerTier,
+            fundsReceiver,
+            true // Use treasury
         );
         
         // Add USDTieredSTO module to security token
-        // Note: This might fail in a real deployment without proper setup data
-        // This is just a placeholder for the script
         address usdTieredSTOModule = token.addModule(
             address(usdTieredSTOFactory),
             usdTieredSTOSetupData,
@@ -321,6 +308,26 @@ contract DeploySTScript is Script {
         );
         
         console.log("USDTieredSTO module deployed at:", usdTieredSTOModule);
+        
+        // Configure USDTieredSTO to accept USDC
+        (bool usdcSuccess,) = usdTieredSTOModule.call(
+            abi.encodeWithSignature(
+                "addFundRaiseType(uint8,address,uint256)",
+                1, // Fund raise type for stable coins
+                USDC_ADDRESS, // USDC token address
+                10 ** 6 // USDC has 6 decimals
+            )
+        );
+        require(usdcSuccess, "Failed to add USDC as payment method");
+        
+        // Disable ETH payments
+        (bool disableEthSuccess,) = usdTieredSTOModule.call(
+            abi.encodeWithSignature(
+                "removeFundRaiseType(uint8)",
+                0 // Fund raise type for ETH
+            )
+        );
+        require(disableEthSuccess, "Failed to disable ETH payments");
         
         // 7. Deploy and configure Wallet module (VestingEscrowWallet)
         VestingEscrowWalletFactory vestingWalletFactory;

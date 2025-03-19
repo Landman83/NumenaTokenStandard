@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import "../../TransferManager/TransferManager.sol";
 import "../../../interfaces/ISecurityToken.sol";
@@ -49,19 +49,20 @@ contract KYCTransferManager is TransferManager {
 
     /**
      * @notice Verify if a transfer is valid
-     * @param _from Address of the sender
+     * @param _from Address of the sender (unused)
      * @param _to Address of the receiver
-     * @param _amount Amount of tokens to transfer
-     * @param _data Additional data attached to the transfer
+     * @param _amount Amount of tokens to transfer (unused)
+     * @param _data Additional data attached to the transfer (unused)
      * @return Result indicating if transfer is valid, invalid, or NA
      * @return bytes32 Reason code
      */
-    function verifyTransfer(address /*_from*/, address _to, uint256 /*_amount*/, bytes memory /* _data */) 
+    function verifyTransfer(address _from, address _to, uint256 _amount, bytes memory _data) 
         public 
         view 
         override 
         returns(Result, bytes32) 
     {
+        // Parameters _from, _amount, and _data are intentionally unused
         if (!paused() && checkKYC(_to)) {
             return (Result.VALID, bytes32(uint256(uint160(address(this))) << 96));
         }
@@ -73,7 +74,7 @@ contract KYCTransferManager is TransferManager {
      * @param _investor Address of the investor
      * @param _kycStatus New KYC status
      */
-    function modifyKYC(address _investor, bool _kycStatus) public onlyRole(ADMIN) {
+    function modifyKYC(address _investor, bool _kycStatus) public withPerm(ADMIN) {
         _modifyKYC(_investor, _kycStatus);
     }
 
@@ -99,8 +100,6 @@ contract KYCTransferManager is TransferManager {
             //Corrects the index of last element as delete functions move last element to index.
             dataStore.setUint256(_getKYCKey(lastAddress), kycNumber);
         }
-        //Alternatively, we can just emit an event and not maintain the KYC array on chain.
-        //I am maintaining the array to showcase how it can be done in cases where it might be needed.
     }
 
     /**

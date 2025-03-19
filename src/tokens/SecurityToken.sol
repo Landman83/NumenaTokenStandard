@@ -27,7 +27,15 @@ import "@openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
  * @notice - ST does not inherit from ISecurityToken due to:
  * @notice - https://github.com/ethereum/solidity/issues/4847
  */
-contract SecurityToken is ERC20, ReentrancyGuard, SecurityTokenStorage, IERC1594, IERC1643, IERC1644, IERC1410, Proxy {
+contract SecurityToken is ReentrancyGuard, SecurityTokenStorage, IERC1594, IERC1643, IERC1644, IERC1410, Proxy {
+    // ERC20 storage
+    mapping(address => uint256) private _balances;
+    mapping(address => mapping(address => uint256)) private _allowances;
+    uint256 private _totalSupply;
+    
+    // ERC20 events
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 
     // Emit at the time when module get added
     event ModuleAdded(
@@ -72,7 +80,7 @@ contract SecurityToken is ERC20, ReentrancyGuard, SecurityTokenStorage, IERC1594
     event ModuleBudgetChanged(uint8[] _moduleTypes, address _module, uint256 _oldBudget, uint256 _budget); //Event emitted by the tokenLib.
 
     // Constructor
-    constructor() ERC20("", "") {
+    constructor() {
         initialized = true;
     }
 
@@ -415,7 +423,7 @@ contract SecurityToken is ERC20, ReentrancyGuard, SecurityTokenStorage, IERC1594
      * @param _value value of transfer
      * @return bool success
      */
-    function transfer(address _to, uint256 _value) public override returns(bool) {
+    function transfer(address _to, uint256 _value) public returns(bool) {
         _transferWithData(msg.sender, _to, _value, "");
         return true;
     }
@@ -447,7 +455,7 @@ contract SecurityToken is ERC20, ReentrancyGuard, SecurityTokenStorage, IERC1594
      * @param _value value of transfer
      * @return bool success
      */
-    function transferFrom(address _from, address _to, uint256 _value) public override returns(bool) {
+    function transferFrom(address _from, address _to, uint256 _value) public returns(bool) {
         transferFromWithData(_from, _to, _value, "");
         return true;
     }
@@ -467,7 +475,8 @@ contract SecurityToken is ERC20, ReentrancyGuard, SecurityTokenStorage, IERC1594
      */
     function transferFromWithData(address _from, address _to, uint256 _value, bytes memory _data) public {
         _isValidTransfer(_updateTransfer(_from, _to, _value, _data));
-        super.transferFrom(_from, _to, _value);
+        _spendAllowance(_from, msg.sender, _value);
+        _transfer(_from, _to, _value);
     }
 
     /**
@@ -629,7 +638,7 @@ contract SecurityToken is ERC20, ReentrancyGuard, SecurityTokenStorage, IERC1594
      * @param _to receiver of transfer
      * @param _value value of transfer
      * @param _data data to indicate validation
-     * @return bool success
+     * @return verified Whether the transfer is verified
      */
     function _updateTransfer(address _from, address _to, uint256 _value, bytes memory _data) internal nonReentrant returns(bool verified) {
         // NB - the ordering in this function implies the following:
@@ -742,7 +751,6 @@ contract SecurityToken is ERC20, ReentrancyGuard, SecurityTokenStorage, IERC1594
      * @dev Can only be called by the issuer or STO attached to the token.
      * @param _tokenHolders A list of addresses to whom the minted tokens will be dilivered
      * @param _values A list of number of tokens get minted and transfer to corresponding address of the investor from _tokenHolders[] list
-     * @return success
      */
     function issueMulti(address[] memory _tokenHolders, uint256[] memory _values) public {
         _isIssuanceAllowed();
@@ -907,10 +915,10 @@ contract SecurityToken is ERC20, ReentrancyGuard, SecurityTokenStorage, IERC1594
      * @param _to address The address which you want to transfer to
      * @param _value uint256 the amount of tokens to be transferred
      * @param _data The `bytes _data` allows arbitrary data to be submitted alongside the transfer.
-     * @return byte Ethereum status code (ESC)
-     * @return bytes32 Application specific reason code
+     * @return statusCode Ethereum status code (ESC)
+     * @return reasonCode Application specific reason code
      */
-    function canTransfer(address _to, uint256 _value, bytes calldata _data) external view returns (byte, bytes32) {
+    function canTransfer(address _to, uint256 _value, bytes calldata _data) external view returns (bytes1 statusCode, bytes32 reasonCode) {
         return _canTransfer(msg.sender, _to, _value, _data);
     }
 
@@ -922,17 +930,17 @@ contract SecurityToken is ERC20, ReentrancyGuard, SecurityTokenStorage, IERC1594
      * @param _to address The address which you want to transfer to
      * @param _value uint256 the amount of tokens to be transferred
      * @param _data The `bytes _data` allows arbitrary data to be submitted alongside the transfer.
-     * @return byte Ethereum status code (ESC)
-     * @return bytes32 Application specific reason code
+     * @return statusCode Ethereum status code (ESC)
+     * @return reasonCode Application specific reason code
      */
-    function canTransferFrom(address _from, address _to, uint256 _value, bytes calldata _data) external view returns (byte reasonCode, bytes32 appCode) {
-        (reasonCode, appCode) = _canTransfer(_from, _to, _value, _data);
-        if (_isSuccess(reasonCode) && _value > allowance(_from, msg.sender)) {
+    function canTransferFrom(address _from, address _to, uint256 _value, bytes calldata _data) external view returns (bytes1 statusCode, bytes32 reasonCode) {
+        (statusCode, reasonCode) = _canTransfer(_from, _to, _value, _data);
+        if (_isSuccess(statusCode) && _value > allowance(_from, msg.sender)) {
             return (StatusCodes.code(StatusCodes.Status.InsufficientAllowance), bytes32(0));
         }
     }
 
-    function _canTransfer(address _from, address _to, uint256 _value, bytes memory _data) internal view returns (byte, bytes32) {
+    function _canTransfer(address _from, address _to, uint256 _value, bytes memory _data) internal view returns (bytes1, bytes32) {
         bytes32 appCode;
         bool success;
         if (_value % granularity != 0) {
@@ -950,9 +958,9 @@ contract SecurityToken is ERC20, ReentrancyGuard, SecurityTokenStorage, IERC1594
      * @param _partition The partition from which to transfer tokens
      * @param _value The amount of tokens to transfer from `_partition`
      * @param _data Additional data attached to the transfer of tokens
-     * @return ESC (Ethereum Status Code) following the EIP-1066 standard
-     * @return Application specific reason codes with additional details
-     * @return The partition to which the transferred tokens were allocated for the _to address
+     * @return statusCode ESC (Ethereum Status Code) following the EIP-1066 standard
+     * @return reasonCode Application specific reason codes with additional details
+     * @return partition The partition to which the transferred tokens were allocated for the _to address
      */
     function canTransferByPartition(
         address _from,
@@ -963,16 +971,16 @@ contract SecurityToken is ERC20, ReentrancyGuard, SecurityTokenStorage, IERC1594
     )
         external
         view
-        returns (byte reasonCode, bytes32 appStatusCode, bytes32 toPartition)
+        returns (bytes1 statusCode, bytes32 reasonCode, bytes32 partition)
     {
         if (_partition == UNLOCKED) {
-            (reasonCode, appStatusCode) = _canTransfer(_from, _to, _value, _data);
-            if (_isSuccess(reasonCode)) {
+            (statusCode, reasonCode) = _canTransfer(_from, _to, _value, _data);
+            if (_isSuccess(statusCode)) {
                 uint256 beforeBalance = _balanceOfByPartition(LOCKED, _to, 0);
                 uint256 afterbalance = _balanceOfByPartition(LOCKED, _to, _value);
-                toPartition = _returnPartition(beforeBalance, afterbalance, _value);
+                partition = _returnPartition(beforeBalance, afterbalance, _value);
             }
-            return (reasonCode, appStatusCode, toPartition);
+            return (statusCode, reasonCode, partition);
         }
         return (StatusCodes.code(StatusCodes.Status.TransferFailure), bytes32(0), bytes32(0));
     }
@@ -1099,7 +1107,73 @@ contract SecurityToken is ERC20, ReentrancyGuard, SecurityTokenStorage, IERC1594
     * @param status Binary ERC-1066 status code
     * @return successful A boolean representing if the status code represents success
     */
-    function _isSuccess(byte status) internal pure returns (bool successful) {
+    function _isSuccess(bytes1 status) internal pure returns (bool successful) {
         return (status & 0x0F) == 0x01;
+    }
+    
+    // Essential ERC20 functions
+    function totalSupply() public view returns (uint256) {
+        return _totalSupply;
+    }
+    
+    function balanceOf(address account) public view returns (uint256) {
+        return _balances[account];
+    }
+    
+    function allowance(address owner, address spender) public view returns (uint256) {
+        return _allowances[owner][spender];
+    }
+    
+    function _transfer(address from, address to, uint256 amount) internal {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+        
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[from] = fromBalance - amount;
+            _balances[to] += amount;
+        }
+        
+        emit Transfer(from, to, amount);
+    }
+    
+    function _mint(address account, uint256 amount) internal {
+        require(account != address(0), "ERC20: mint to the zero address");
+        
+        _totalSupply += amount;
+        _balances[account] += amount;
+        emit Transfer(address(0), account, amount);
+    }
+    
+    function _burn(address account, uint256 amount) internal {
+        require(account != address(0), "ERC20: burn from the zero address");
+        
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+            _totalSupply -= amount;
+        }
+        
+        emit Transfer(account, address(0), amount);
+    }
+    
+    function _approve(address owner, address spender, uint256 amount) internal {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+        
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+    
+    function _spendAllowance(address owner, address spender, uint256 amount) internal {
+        uint256 currentAllowance = allowance(owner, spender);
+        if (currentAllowance != type(uint256).max) {
+            require(currentAllowance >= amount, "ERC20: insufficient allowance");
+            unchecked {
+                _approve(owner, spender, currentAllowance - amount);
+            }
+        }
     }
 }

@@ -11,7 +11,7 @@ interface IPermissionManager {
      * @param _delegate Address of the delegate
      * @param _module Address of the module
      * @param _perm Permission flag
-     * @return bool Permission allowed or not
+     * @return hasPermission Whether the delegate has the requested permission Permission allowed or not
      */
     function checkPermission(address _delegate, address _module, bytes32 _perm) external view returns(bool);
 
@@ -23,18 +23,18 @@ interface IPermissionManager {
     function getPermissions(address _module) external view returns(bytes32[] memory);
 
     /**
-     * @notice Used to return all delegates with a given permission for a module
+     * @notice Returns list of delegates with specific permission for a module
      * @param _module Address of the module
      * @param _perm Permission flag
-     * @return address[] List of delegate addresses
+     * @return delegates List of delegate addresses
      */
-    function getAllDelegatesWithPerm(address _module, bytes32 _perm) external view returns(address[] memory);
+    function getAllDelegatesWithPerm(address _module, bytes32 _perm) external view returns(address[] memory delegates);
 
     /**
      * @notice Used to check if permission is available at the permission manager level
      * @param _module Address of the module
      * @param _perm Permission flag
-     * @return bool Whether permission exists or not
+     * @return hasPermission Whether permission exists or not
      */
     function checkPerm(address _module, bytes32 _perm) external view returns(bool);
 
@@ -64,7 +64,6 @@ interface IPermissionManager {
     * @param _module Ethereum contract address of the module
     * @param _perm Permission flag
     * @param _valid Bool flag use to switch on/off the permission
-    * @return bool
     */
     function changePermission(address _delegate, address _module, bytes32 _perm, bool _valid) external;
 
@@ -82,13 +81,14 @@ interface IPermissionManager {
         bool[] calldata _valids
     ) external;
 
-    /**
+    // This function is commented out because it's already defined above
+    /*
     * @notice Used to return all delegates with a given permission and module
     * @param _module Ethereum contract address of the module
     * @param _perm Permission flag
-    * @return address[]
+    * @return delegates List of delegate addresses
     */
-    function getAllDelegatesWithPerm(address _module, bytes32 _perm) external view returns(address[] memory);
+    // function getAllDelegatesWithPerm(address _module, bytes32 _perm) external view returns(address[] memory delegates);
 
     /**
     * @notice Used to return all permission of a single or multiple module

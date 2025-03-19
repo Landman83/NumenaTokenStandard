@@ -35,12 +35,9 @@ contract STFactory is ISTFactory, Ownable {
     uint256 public latestUpgrade;
 
     event LogicContractSet(string _version, uint256 _upgrade, address _logicContract, bytes _initializationData, bytes _upgradeData);
-    event TokenUpgraded(
-        address indexed _securityToken,
-        uint256 indexed _version
-    );
-    event DefaultTransferManagerUpdated(address indexed _oldTransferManagerFactory, address indexed _newTransferManagerFactory);
-    event DefaultDataStoreUpdated(address indexed _oldDataStoreFactory, address indexed _newDataStoreFactory);
+    // event TokenUpgraded defined in ISTFactory
+    // event DefaultTransferManagerUpdated defined in ISTFactory
+    // event DefaultDataStoreUpdated defined in ISTFactory
 
     constructor(
         address _polymathRegistry,

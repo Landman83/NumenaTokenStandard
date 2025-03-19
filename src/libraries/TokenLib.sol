@@ -186,7 +186,7 @@ library TokenLib {
         // Instead of .length-- we need to use pop() in Solidity 0.8.x
         if (length > 0) {
             assembly {
-                sstore(add(_names.slot, keccak256(abi.encode(name, _names.slot))), sub(length, 1))
+                sstore(add(_names.slot, keccak256(add(name, 0x20), mload(name))), sub(length, 1))
             }
         }
         if ((length - 1) != index) {
@@ -212,7 +212,9 @@ library TokenLib {
         // Instead of .length-- we need to use pop() in Solidity 0.8.x
         if (length > 0) {
             assembly {
-                sstore(add(_modules.slot, keccak256(abi.encode(_type, _modules.slot))), sub(length, 1))
+                // Use direct keccak256 with the raw value
+                let typeAsBytes32 := _type
+                sstore(add(_modules.slot, keccak256(typeAsBytes32, 32)), sub(length, 1))
             }
         }
 
@@ -470,7 +472,7 @@ library TokenLib {
     )
         external
         pure
-        returns (byte, bytes32)
+        returns (bytes1, bytes32)
     {
         if (!success)
             return (StatusCodes.code(StatusCodes.Status.TransferFailure), appCode);

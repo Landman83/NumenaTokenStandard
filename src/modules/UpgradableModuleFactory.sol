@@ -8,7 +8,7 @@ import "../proxy/OwnedUpgradeabilityProxy.sol";
 /**
  * @title Factory for deploying upgradable modules
  */
-contract UpgradableModuleFactory is ModuleFactory {
+abstract contract UpgradableModuleFactory is ModuleFactory {
 
     event LogicContractSet(string _version, uint256 _upgrade, address _logicContract, bytes _upgradeData);
 

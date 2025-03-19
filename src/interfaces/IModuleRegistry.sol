@@ -57,7 +57,7 @@ interface IModuleRegistry {
      * @notice Check that a module and its factory are compatible
      * @param _moduleFactory is the address of the relevant module factory
      * @param _securityToken is the address of the relevant security token
-     * @return bool whether module and token are compatible
+     * @return isCompatible Whether module and token are compatible
      */
     function isCompatibleModule(address _moduleFactory, address _securityToken) external view returns(bool isCompatible);
 

@@ -58,7 +58,7 @@ library Util {
         uint charCount = 0;
         uint j = 0;
         for (j = 0; j < 32; j++) {
-            byte char = byte(bytes32(uint(_source) * 2 ** (8 * j)));
+            bytes1 char = bytes1(bytes32(uint(_source) * 2 ** (8 * j)));
             if (char != 0) {
                 bytesString[charCount] = char;
                 charCount++;

@@ -16,7 +16,7 @@ library StatusCodes {
         InvalidOperator
     }
 
-    function code(Status _status) internal pure returns (byte) {
-        return byte(uint8(0x50) + uint8(_status));
+    function code(Status _status) internal pure returns (bytes1) {
+        return bytes1(uint8(0x50) + uint8(_status));
     }
 }

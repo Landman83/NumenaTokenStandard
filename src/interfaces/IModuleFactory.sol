@@ -78,17 +78,17 @@ interface IModuleFactory {
     /**
      * @notice Get the setup cost of the module
      */
-    function setupCostInPoly() external view returns (uint256 polySetupCost);
+    function setupCostInPoly() external returns (uint256);
 
     /**
      * @notice Used to get the lower bound
-     * @return Lower bound
+     * @return lowerBounds Lower bound values
      */
     function getLowerSTVersionBounds() external view returns(uint8[] memory lowerBounds);
 
     /**
      * @notice Used to get the upper bound
-     * @return Upper bound
+     * @return upperBounds Upper bound values
      */
     function getUpperSTVersionBounds() external view returns(uint8[] memory upperBounds);
 

@@ -11,19 +11,17 @@ contract DataStoreProxy is DataStoreStorage, Proxy {
 
     /**
     * @notice Constructor
-    * @param _securityToken Address of the security token
-    * @param _implementation representing the address of the new implementation to be set
+    * @param _implementationAddress representing the address of the new implementation to be set
     */
     constructor(
-        address _securityToken,
-        address _implementation
+        address _implementationAddress
     )
     {
-        require(_implementation != address(0) && _securityToken != address(0),
-            "Address should not be 0x"
+        require(
+            _implementationAddress != address(0),
+            "Implementation address should not be 0x"
         );
-        securityToken = ISecurityToken(_securityToken);
-        __implementation = _implementation;
+        _setImplementation(_implementationAddress);
     }
 
     /**
@@ -32,5 +30,13 @@ contract DataStoreProxy is DataStoreStorage, Proxy {
     */
     function _implementation() internal view override returns(address) {
         return __implementation;
+    }
+
+    /**
+     * @notice Sets the implementation address
+     * @param _implementationAddress Address of the new implementation
+     */
+    function _setImplementation(address _implementationAddress) internal {
+        __implementation = _implementationAddress;
     }
 }

@@ -13,7 +13,7 @@ contract DataStoreFactory {
     }
 
     function generateDataStore(address _securityToken) public returns (address) {
-        DataStoreProxy dsProxy = new DataStoreProxy(_securityToken, implementation);
+        DataStoreProxy dsProxy = new DataStoreProxy(implementation);
         return address(dsProxy);
     }
 }

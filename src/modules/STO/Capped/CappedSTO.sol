@@ -9,7 +9,7 @@ import "./CappedSTOStorage.sol";
  * @title STO module for standard capped crowdsale
  */
 contract CappedSTO is CappedSTOStorage, STO, ReentrancyGuard {
-    using SafeMath for uint256;
+
 
     /**
     * Event for token purchase logging
@@ -106,7 +106,7 @@ contract CappedSTO is CappedSTOStorage, STO, ReentrancyGuard {
 
         uint256 weiAmount = msg.value;
         uint256 refund = _processTx(_beneficiary, weiAmount);
-        weiAmount = weiAmount.sub(refund);
+        weiAmount = weiAmount - refund;
 
         _forwardFunds(refund);
     }
@@ -118,7 +118,7 @@ contract CappedSTO is CappedSTOStorage, STO, ReentrancyGuard {
     function buyTokensWithPoly(uint256 _investedPOLY) public whenNotPaused nonReentrant {
         require(fundRaiseTypes[uint8(FundRaiseType.POLY)], "Mode of investment is not POLY");
         uint256 refund = _processTx(msg.sender, _investedPOLY);
-        _forwardPoly(msg.sender, wallet, _investedPOLY.sub(refund));
+        _forwardPoly(msg.sender, wallet, _investedPOLY - refund);
     }
 
     /**
@@ -194,15 +194,15 @@ contract CappedSTO is CappedSTOStorage, STO, ReentrancyGuard {
         // calculate token amount to be created
         uint256 tokens;
         (tokens, refund) = _getTokenAmount(_investedAmount);
-        _investedAmount = _investedAmount.sub(refund);
+        _investedAmount = _investedAmount - refund;
 
         // update state
         if (fundRaiseTypes[uint8(FundRaiseType.POLY)]) {
-            fundsRaised[uint8(FundRaiseType.POLY)] = fundsRaised[uint8(FundRaiseType.POLY)].add(_investedAmount);
+            fundsRaised[uint8(FundRaiseType.POLY)] = fundsRaised[uint8(FundRaiseType.POLY)] + _investedAmount;
         } else {
-            fundsRaised[uint8(FundRaiseType.ETH)] = fundsRaised[uint8(FundRaiseType.ETH)].add(_investedAmount);
+            fundsRaised[uint8(FundRaiseType.ETH)] = fundsRaised[uint8(FundRaiseType.ETH)] + _investedAmount;
         }
-        totalTokensSold = totalTokensSold.add(tokens);
+        totalTokensSold = totalTokensSold + tokens;
 
         _processPurchase(_beneficiary, tokens);
         emit TokenPurchase(msg.sender, _beneficiary, _investedAmount, tokens);
@@ -241,7 +241,7 @@ contract CappedSTO is CappedSTOStorage, STO, ReentrancyGuard {
         if (investors[_beneficiary] == 0) {
             investorCount = investorCount + 1;
         }
-        investors[_beneficiary] = investors[_beneficiary].add(_tokenAmount);
+        investors[_beneficiary] = investors[_beneficiary] + _tokenAmount;
 
         _deliverTokens(_beneficiary, _tokenAmount);
     }
@@ -253,16 +253,16 @@ contract CappedSTO is CappedSTOStorage, STO, ReentrancyGuard {
     * @return refund Remaining amount that should be refunded to the investor
     */
     function _getTokenAmount(uint256 _investedAmount) internal view returns(uint256 tokens, uint256 refund) {
-        tokens = _investedAmount.mul(rate);
-        tokens = tokens.div(uint256(10) ** 18);
-        if (totalTokensSold.add(tokens) > cap) {
-            tokens = cap.sub(totalTokensSold);
+        tokens = _investedAmount * rate;
+        tokens = tokens / (uint256(10) ** 18);
+        if (totalTokensSold + tokens > cap) {
+            tokens = cap - totalTokensSold;
         }
         uint256 granularity = securityToken.granularity();
-        tokens = tokens.div(granularity);
-        tokens = tokens.mul(granularity);
+        tokens = tokens / granularity;
+        tokens = tokens * granularity;
         require(tokens > 0, "Cap reached");
-        refund = _investedAmount.sub((tokens.mul(uint256(10) ** 18)).div(rate));
+        refund = _investedAmount - ((tokens * (uint256(10) ** 18)) / rate);
     }
 
     /**
@@ -270,7 +270,7 @@ contract CappedSTO is CappedSTOStorage, STO, ReentrancyGuard {
     * @param _refund Amount to be refunded
     */
     function _forwardFunds(uint256 _refund) internal {
-        payable(wallet).transfer(msg.value.sub(_refund));
+        payable(wallet).transfer(msg.value - _refund);
         payable(msg.sender).transfer(_refund);
     }
 

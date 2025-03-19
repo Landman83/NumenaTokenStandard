@@ -8,7 +8,7 @@ import "./VestingEscrowWalletStorage.sol";
  * @title Wallet for core vesting escrow functionality
  */
 contract VestingEscrowWallet is VestingEscrowWalletStorage, Wallet {
-    using SafeMath for uint256;
+
 
     // States used to represent the status of the schedule
     enum State {CREATED, STARTED, COMPLETED}
@@ -104,7 +104,7 @@ contract VestingEscrowWallet is VestingEscrowWalletStorage, Wallet {
             securityToken.transferFrom(msg.sender, address(this), _numberOfTokens),
             "Failed transferFrom"
         );
-        unassignedTokens = unassignedTokens.add(_numberOfTokens);
+        unassignedTokens = unassignedTokens + _numberOfTokens;
         emit DepositTokens(_numberOfTokens, msg.sender);
     }
 
@@ -115,7 +115,7 @@ contract VestingEscrowWallet is VestingEscrowWalletStorage, Wallet {
     function sendToTreasury(uint256 _amount) public withPerm(OPERATOR) {
         require(_amount > 0, "Amount cannot be zero");
         require(_amount <= unassignedTokens, "Amount is greater than unassigned tokens");
-        unassignedTokens = unassignedTokens.sub(_amount);
+        unassignedTokens = unassignedTokens - _amount;
         require(securityToken.transfer(getTreasuryWallet(), _amount), "Transfer failed");
         emit SendToTreasury(_amount, msg.sender);
     }

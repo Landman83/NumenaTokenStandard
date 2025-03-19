@@ -1,14 +1,14 @@
-pragma solidity 0.5.8;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
 import "./OZStorage.sol";
 import "./SecurityTokenStorage.sol";
 import "../libraries/TokenLib.sol";
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "../modules/PermissionManager/IPermissionManager.sol";
 
 contract STGetter is OZStorage, SecurityTokenStorage {
 
-    using SafeMath for uint256;
+
 
     /**
      * @notice A security token issuer can specify that issuance has finished for the token
@@ -40,7 +40,7 @@ contract STGetter is OZStorage, SecurityTokenStorage {
     /**
      * @notice returns an array of investors
      * NB - this length may differ from investorCount as it contains all investors that ever held tokens
-     * @return list of addresses
+     * @return investors List of investor addresses
      */
     function getInvestors() public view returns(address[] memory investors) {
         investors = dataStore.getAddressArray(INVESTORSKEY);
@@ -105,14 +105,21 @@ contract STGetter is OZStorage, SecurityTokenStorage {
     /**
      * @notice Returns the data associated to a module
      * @param _module address of the module
-     * @return bytes32 name
-     * @return address module address
-     * @return address module factory address
-     * @return bool module archived
-     * @return uint8 array of module types
-     * @return bytes32 module label
+     * @return name bytes32 name
+     * @return moduleAddress address module address
+     * @return factoryAddress address module factory address
+     * @return isArchived bool module archived
+     * @return types uint8[] array of module types
+     * @return label bytes32 module label
      */
-    function getModule(address _module) external view returns(bytes32, address, address, bool, uint8[] memory, bytes32) {
+    function getModule(address _module) external view returns(
+        bytes32 name,
+        address moduleAddress,
+        address factoryAddress,
+        bool isArchived,
+        uint8[] memory types,
+        bytes32 label
+    ) {
         return (
             modulesToData[_module].name,
             modulesToData[_module].module,
@@ -143,6 +150,7 @@ contract STGetter is OZStorage, SecurityTokenStorage {
 
     /**
      * @notice use to return the global treasury wallet
+     * @return address of the treasury wallet
      */
     function getTreasuryWallet() external view returns(address) {
         return dataStore.getAddress(TREASURY);
@@ -152,19 +160,20 @@ contract STGetter is OZStorage, SecurityTokenStorage {
      * @notice Queries balances as of a defined checkpoint
      * @param _investor Investor to query balance for
      * @param _checkpointId Checkpoint ID to query as of
+     * @return balance at the checkpoint
      */
     function balanceOfAt(address _investor, uint256 _checkpointId) public view returns(uint256) {
-        require(_checkpointId <= currentCheckpointId);
+        require(_checkpointId <= currentCheckpointId, "Invalid checkpoint ID");
         return TokenLib.getValueAt(checkpointBalances[_investor], _checkpointId, balanceOf(_investor));
     }
 
     /**
      * @notice Queries totalSupply as of a defined checkpoint
      * @param _checkpointId Checkpoint ID to query
-     * @return uint256
+     * @return uint256 Total supply at the checkpoint
      */
     function totalSupplyAt(uint256 _checkpointId) external view returns(uint256) {
-        require(_checkpointId <= currentCheckpointId);
+        require(_checkpointId <= currentCheckpointId, "Invalid checkpoint ID");
         return checkpointTotalSupply[_checkpointId];
     }
 
@@ -186,7 +195,7 @@ contract STGetter is OZStorage, SecurityTokenStorage {
      * @param _delegate address of delegate
      * @param _module address of PermissionManager module
      * @param _perm the permissions
-     * @return success
+     * @return success whether permission is valid
      */
     function checkPermission(address _delegate, address _module, bytes32 _perm) public view returns(bool) {
         for (uint256 i = 0; i < modules[PERMISSION_KEY].length; i++) {
@@ -206,7 +215,7 @@ contract STGetter is OZStorage, SecurityTokenStorage {
      * @return Whether the `_operator` is an operator for all partitions of `_tokenHolder`
      */
     function isOperator(address _operator, address _tokenHolder) external view returns (bool) {
-        return (_allowance(_tokenHolder, _operator) == uint(-1));
+        return (_allowance(_tokenHolder, _operator) == type(uint256).max);
     }
 
     /**
@@ -233,6 +242,7 @@ contract STGetter is OZStorage, SecurityTokenStorage {
 
     /**
      * @notice Returns the version of the SecurityToken
+     * @return version array with major, minor, patch
      */
     function getVersion() external view returns(uint8[] memory) {
         uint8[] memory version = new uint8[](3);
@@ -245,11 +255,11 @@ contract STGetter is OZStorage, SecurityTokenStorage {
     /**
      * @notice Used to return the details of a document with a known name (`bytes32`).
      * @param _name Name of the document
-     * @return string The URI associated with the document.
-     * @return bytes32 The hash (of the contents) of the document.
-     * @return uint256 the timestamp at which the document was last modified.
+     * @return uri The URI associated with the document.
+     * @return docHash The hash (of the contents) of the document.
+     * @return lastModified the timestamp at which the document was last modified.
      */
-    function getDocument(bytes32 _name) external view returns (string memory, bytes32, uint256) {
+    function getDocument(bytes32 _name) external view returns (string memory uri, bytes32 docHash, uint256 lastModified) {
         return (
             _documents[_name].uri,
             _documents[_name].docHash,
@@ -259,7 +269,7 @@ contract STGetter is OZStorage, SecurityTokenStorage {
 
     /**
      * @notice Used to retrieve a full list of documents attached to the smart contract.
-     * @return bytes32 List of all documents names present in the contract.
+     * @return bytes32[] List of all documents names present in the contract.
      */
     function getAllDocuments() external view returns (bytes32[] memory) {
         return _docNames;
