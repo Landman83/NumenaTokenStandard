@@ -1,0 +1,18 @@
+{
+    "file": "../NumenaTokenStandard/src/modules/TransferManager/LTM/LockupTransferManager_refactored.sol",
+    "ai_review": {
+        "critical_issues": [
+            {
+                "issue": "Missing import for Module",
+                "impact": "Missing import for the 'Module' base class used in the constructor leads to compilation failure."
+            }
+        ],
+        "observations": []
+    },
+    "solhint": {
+        "critical": [
+            "Solhint execution failed"
+        ],
+        "style": []
+    }
+}
